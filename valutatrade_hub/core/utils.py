@@ -4,6 +4,8 @@ import json
 import math
 import os
 import tempfile
+import threading
+from contextlib import contextmanager
 from pathlib import Path
 
 # Учебные значения: стоимость одной единицы валюты в USD
@@ -14,7 +16,6 @@ EXCHANGE_RATES = {
     "RUB": 0.01016,
     "ETH": 3720.0,
 }
-RATE_TTL_SECONDS = 300
 
 
 def normalize_currency_code(currency_code: str) -> str:
@@ -22,8 +23,13 @@ def normalize_currency_code(currency_code: str) -> str:
     if not isinstance(currency_code, str):
         raise ValueError("Код валюты должен быть непустой строкой")
     code = currency_code.strip().upper()
-    if not code or not code.isascii() or not code.isalnum() or not code[0].isalpha():
-        raise ValueError("Код валюты должен содержать латинские буквы и цифры")
+    if (
+        not 2 <= len(code) <= 5
+        or not code.isascii()
+        or not code.isalnum()
+        or not code[0].isalpha()
+    ):
+        raise ValueError("Код валюты должен содержать 2–5 латинских букв или цифр")
     return code
 
 
@@ -71,6 +77,13 @@ class JsonStorage:
     def __init__(self, data_dir: str | Path = "data") -> None:
         """Выбирает папку данных относительно текущего рабочего каталога"""
         self.data_dir = Path(data_dir)
+        self._lock = threading.RLock()
+
+    @contextmanager
+    def transaction(self):
+        """Объединяет чтение и запись в одну операцию в пределах экземпляра"""
+        with self._lock:
+            yield self
 
     def load(self, filename: str, expected_type: type) -> dict | list:
         """Читает JSON; отсутствие файла означает пустую коллекцию"""

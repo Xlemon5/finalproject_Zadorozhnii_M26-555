@@ -125,8 +125,8 @@ class PortfolioTests(unittest.TestCase):
         self.assertAlmostEqual(portfolio.get_total_value(), 100 + 200 * 1.0786)
         self.assertAlmostEqual(portfolio.get_total_value("EUR"), 100 / 1.0786 + 200)
         self.assertEqual(portfolio.get_wallet("EUR").balance, 200)
-        with self.assertRaisesRegex(ValueError, "Неизвестная базовая"):
+        with self.assertRaisesRegex(ValueError, "Неизвестная валюта"):
             portfolio.get_total_value("ABC")
-        portfolio.add_currency("XYZ").deposit(1)
+        portfolio.add_currency("ETH").deposit(1)
         with self.assertRaisesRegex(ValueError, "Не удалось получить курс"):
-            portfolio.get_total_value()
+            portfolio.get_total_value(exchange_rates={"USD": 1, "EUR": 1.0786})

@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from tests.support import silent_logger
 from valutatrade_hub.core.usecases import WalletService
 from valutatrade_hub.core.utils import JsonStorage
 
@@ -16,7 +17,7 @@ class ServiceTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.storage = JsonStorage(self.directory.name)
         self.storage.initialize()
-        self.service = WalletService(self.storage)
+        self.service = WalletService(self.storage, logger=silent_logger())
 
     def register_and_login(self, username="alice"):
         self.service.register(username, "1234")
@@ -90,7 +91,7 @@ class ServiceTests(unittest.TestCase):
         self.assertAlmostEqual(
             self.service.show_portfolio("EUR")["total"], 10000 / 1.0786
         )
-        restarted = WalletService(self.storage)
+        restarted = WalletService(self.storage, logger=silent_logger())
         self.assertIsNone(restarted.current_user)
         restarted.login("alice", "1234")
         self.assertEqual(restarted.show_portfolio(), self.service.show_portfolio())
@@ -109,10 +110,10 @@ class ServiceTests(unittest.TestCase):
         before = self.portfolios_bytes()
         for operation, error in (
             (lambda: self.service.buy("BTC", 1), "Недостаточно средств"),
-            (lambda: self.service.sell("BTC", 1), "нет кошелька"),
-            (lambda: self.service.buy("ABC", 1), "Не удалось получить курс"),
+            (lambda: self.service.sell("BTC", 1), "Недостаточно средств"),
+            (lambda: self.service.buy("ABC", 1), "Неизвестная валюта"),
             (lambda: self.service.buy("USD", 1), "расчётная валюта"),
-            (lambda: self.service.show_portfolio("ABC"), "Неизвестная базовая"),
+            (lambda: self.service.show_portfolio("ABC"), "Неизвестная валюта"),
         ):
             with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):
                 operation()

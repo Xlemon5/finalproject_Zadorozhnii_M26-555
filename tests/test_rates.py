@@ -6,7 +6,9 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from valutatrade_hub.core.rates import RateService, RateUnavailableError
+from valutatrade_hub.core.currencies import CURRENCY_REGISTRY, CryptoCurrency
+from valutatrade_hub.core.exceptions import ApiRequestError, CurrencyNotFoundError
+from valutatrade_hub.core.rates import RateService
 from valutatrade_hub.core.utils import JsonStorage
 
 
@@ -81,11 +83,19 @@ class RateTests(unittest.TestCase):
                     )
 
     def test_custom_currency_works_only_while_cache_is_fresh(self):
+        registry = patch.dict(
+            CURRENCY_REGISTRY,
+            {
+                "DOGE": CryptoCurrency("Dogecoin", "DOGE", "Scrypt", 1e9),
+            },
+        )
+        registry.start()
+        self.addCleanup(registry.stop)
         self.storage.save("rates.json", {"DOGE_USD": self.entry(0.2)})
         self.assertEqual(self.service.get_rate("DOGE", "USD")["rate"], 0.2)
         self.storage.save("rates.json", {"DOGE_USD": self.entry(0.2, age=301)})
         before = (Path(self.directory.name) / "rates.json").read_bytes()
-        with self.assertRaises(RateUnavailableError):
+        with self.assertRaises(ApiRequestError):
             self.service.get_rate("DOGE", "USD")
         self.assertEqual(
             (Path(self.directory.name) / "rates.json").read_bytes(), before
@@ -93,7 +103,7 @@ class RateTests(unittest.TestCase):
 
     def test_unknown_codes_and_invalid_syntax_are_rejected(self):
         for source, target in (("ABC", "USD"), ("ABC", "ABC")):
-            with self.subTest(source=source), self.assertRaises(RateUnavailableError):
+            with self.subTest(source=source), self.assertRaises(CurrencyNotFoundError):
                 self.service.get_rate(source, target)
         for code in ("", "../USD", None):
             with self.subTest(code=code), self.assertRaises(ValueError):
@@ -112,3 +122,26 @@ class RateTests(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 self.service.get_rate("BTC", "USD")
             self.assertEqual(path.read_text(), invalid)
+
+    def test_provider_errors_and_invalid_responses_preserve_cache(self):
+        self.storage.save("rates.json", {"BTC_USD": self.entry(70000, age=301)})
+        path = Path(self.directory.name) / "rates.json"
+        before = path.read_bytes()
+        responses = (
+            None,
+            {},
+            {"source": "Test", "rates": {"USD": 1, "BTC": -1}},
+            {"source": "Test", "rates": {"USD": 1, "BTC": float("inf")}},
+        )
+        for response in responses:
+            with self.subTest(response=response):
+                with patch.object(self.service, "_provider", return_value=response):
+                    with self.assertRaises(ApiRequestError):
+                        self.service.get_rate("BTC", "USD")
+                self.assertEqual(path.read_bytes(), before)
+        with patch.object(
+            self.service, "_provider", side_effect=RuntimeError("offline")
+        ):
+            with self.assertRaisesRegex(ApiRequestError, "offline"):
+                self.service.get_rate("BTC", "USD")
+        self.assertEqual(path.read_bytes(), before)

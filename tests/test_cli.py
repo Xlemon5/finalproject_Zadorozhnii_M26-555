@@ -10,6 +10,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+from tests.support import silent_logger
 from valutatrade_hub.cli.interface import WalletCLI, parse_command
 from valutatrade_hub.core.usecases import WalletService
 from valutatrade_hub.core.utils import JsonStorage
@@ -19,7 +20,9 @@ class CLITests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        self.cli = WalletCLI(WalletService(JsonStorage(self.directory.name)))
+        self.cli = WalletCLI(
+            WalletService(JsonStorage(self.directory.name), logger=silent_logger())
+        )
 
     def execute(self, command):
         output = io.StringIO()

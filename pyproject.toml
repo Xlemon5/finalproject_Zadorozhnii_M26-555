@@ -36,3 +36,18 @@ extend-exclude = ["venv", ".venv", "dist", "__pycache__"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.valutatrade]
+data_dir = "data"
+users_file = "users.json"
+portfolios_file = "portfolios.json"
+rates_file = "rates.json"
+rates_ttl_seconds = 300
+default_base_currency = "USD"
+log_dir = "logs"
+log_file = "actions.log"
+log_format = "json"
+log_level = "INFO"
+log_max_bytes = 1048576
+log_backup_count = 3
+log_verbose = false

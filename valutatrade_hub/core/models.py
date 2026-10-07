@@ -5,9 +5,13 @@ import hmac
 import math
 from datetime import datetime
 
+from valutatrade_hub.core.currencies import get_currency
+from valutatrade_hub.core.exceptions import (
+    CurrencyNotFoundError,
+    InsufficientFundsError,
+)
 from valutatrade_hub.core.utils import (
     EXCHANGE_RATES,
-    normalize_currency_code,
     normalize_username,
     validate_number,
     validate_password,
@@ -109,7 +113,7 @@ class Wallet:
 
     def __init__(self, currency_code: str, balance: float = 0.0) -> None:
         """Создаёт кошелёк с неотрицательным балансом"""
-        self._currency_code = normalize_currency_code(currency_code)
+        self._currency_code = get_currency(currency_code).code
         self.balance = balance
 
     @property
@@ -139,10 +143,7 @@ class Wallet:
         """Списывает сумму, если в кошельке достаточно средств"""
         amount = validate_number(amount, positive=True)
         if amount > self.balance:
-            raise ValueError(
-                f"Недостаточно средств: доступно {self.balance:.4f} "
-                f"{self.currency_code}, требуется {amount:.4f} {self.currency_code}"
-            )
+            raise InsufficientFundsError(self.balance, amount, self.currency_code)
         result = self.balance - amount
         if result == self.balance:
             raise ValueError("Сумма слишком мала для изменения текущего баланса")
@@ -193,14 +194,14 @@ class Portfolio:
 
     def add_currency(self, currency_code: str) -> Wallet:
         """Добавляет пустой кошелёк; существующий возвращает без изменений"""
-        code = normalize_currency_code(currency_code)
+        code = get_currency(currency_code).code
         if code not in self._wallets:
             self._wallets[code] = Wallet(code)
         return self._wallets[code]
 
     def get_wallet(self, currency_code: str) -> Wallet:
         """Возвращает кошелёк либо сообщает о его отсутствии"""
-        code = normalize_currency_code(currency_code)
+        code = get_currency(currency_code).code
         if code not in self._wallets:
             raise ValueError(
                 f"У вас нет кошелька '{code}'. Добавьте валюту: "
@@ -214,10 +215,10 @@ class Portfolio:
         exchange_rates: dict[str, float] | None = None,
     ) -> float:
         """Суммирует балансы по курсам к общей валюте; по умолчанию к USD"""
-        base = normalize_currency_code(base_currency)
+        base = get_currency(base_currency).code
         rates = EXCHANGE_RATES if exchange_rates is None else exchange_rates
         if base not in rates:
-            raise ValueError(f"Неизвестная базовая валюта '{base}'")
+            raise CurrencyNotFoundError(base)
         base_rate = validate_number(rates[base], positive=True)
         values = []
         for code, wallet in self._wallets.items():

@@ -2,26 +2,48 @@
 
 from datetime import UTC, datetime
 
+from valutatrade_hub.core.currencies import get_currency, get_supported_codes
+from valutatrade_hub.core.exceptions import ApiRequestError
 from valutatrade_hub.core.utils import (
     EXCHANGE_RATES,
-    RATE_TTL_SECONDS,
     JsonStorage,
     normalize_currency_code,
     validate_number,
 )
-
-
-class RateUnavailableError(ValueError):
-    """Нет свежего курса и заглушка не поддерживает валютную пару"""
+from valutatrade_hub.infra.database import DatabaseManager
+from valutatrade_hub.infra.settings import SettingsLoader
 
 
 class RateService:
     """Читает прямые, обратные и кросс-курсы с ограниченным сроком жизни"""
 
-    def __init__(self, storage: JsonStorage, ttl: int = RATE_TTL_SECONDS) -> None:
+    def __init__(
+        self,
+        storage: JsonStorage | DatabaseManager,
+        ttl: int | None = None,
+        *,
+        settings: SettingsLoader | None = None,
+        provider=None,
+    ) -> None:
         """Настраивает хранилище и срок свежести в секундах"""
         self.storage = storage
-        self.ttl = ttl
+        if ttl is not None and (type(ttl) is not int or ttl <= 0):
+            raise ValueError("TTL должен быть положительным целым числом")
+        self._ttl_override = ttl
+        self.settings = settings if settings is not None else SettingsLoader()
+        self._provider = provider if provider is not None else self._stub_rates
+
+    @property
+    def ttl(self) -> int:
+        """Возвращает актуальный TTL из настроек либо явное переопределение"""
+        if self._ttl_override is not None:
+            return self._ttl_override
+        return self.settings.get("rates_ttl_seconds")
+
+    @staticmethod
+    def _stub_rates() -> dict:
+        """Возвращает учебные курсы в контракте будущего Parser Service"""
+        return {"source": "Stub", "rates": EXCHANGE_RATES.copy()}
 
     @staticmethod
     def _timestamp(value: str) -> datetime:
@@ -61,12 +83,8 @@ class RateService:
         return cache
 
     def known_currencies(self) -> set[str]:
-        """Возвращает валюты заглушки и локального кэша"""
-        result = set(EXCHANGE_RATES)
-        for pair in self._load():
-            if pair not in {"source", "last_refresh"}:
-                result.update(pair.split("_"))
-        return result
+        """Возвращает поддерживаемые валюты из общего реестра"""
+        return set(get_supported_codes())
 
     def _direct(self, cache: dict, source: str, target: str, now: datetime):
         """Ищет свежий прямой или обратный курс"""
@@ -110,33 +128,50 @@ class RateService:
 
     def get_rate(self, from_currency: str, to_currency: str) -> dict:
         """Возвращает rate, updated_at и source; обновляет просроченный кэш"""
-        source = normalize_currency_code(from_currency)
-        target = normalize_currency_code(to_currency)
+        source = get_currency(from_currency).code
+        target = get_currency(to_currency).code
+        with self.storage.transaction():
+            return self._get_rate(source, target)
+
+    def _get_rate(self, source: str, target: str) -> dict:
+        """Читает и при необходимости обновляет кэш под блокировкой хранилища"""
         cache = self._load()
-        known = set(EXCHANGE_RATES)
-        for pair in cache:
-            if pair not in {"source", "last_refresh"}:
-                known.update(pair.split("_"))
         now = datetime.now(UTC)
-        result = None
-        if source in known and target in known:
-            result = self._find(cache, source, target, now)
+        result = self._find(cache, source, target, now)
         if result is not None:
             return {"from": source, "to": target, **result}
-        if source not in EXCHANGE_RATES or target not in EXCHANGE_RATES:
-            raise RateUnavailableError(
-                f"Курс {source}→{target} недоступен. Повторите попытку позже."
-            )
+        try:
+            response = self._provider()
+            rates = response["rates"]
+            provider_name = response["source"]
+            if not isinstance(rates, dict) or not isinstance(provider_name, str):
+                raise ValueError("Некорректный ответ поставщика курсов")
+            for code, rate in rates.items():
+                if get_currency(code).code != code:
+                    raise ValueError("Некорректный код валюты в ответе")
+                validate_number(rate, positive=True)
+            if rates.get("USD") != 1.0 or source not in rates or target not in rates:
+                raise ValueError(f"Нет курса {source}→{target}")
+        except ApiRequestError:
+            raise
+        except Exception as error:
+            raise ApiRequestError(str(error)) from error
         timestamp = now.isoformat(timespec="seconds")
-        for code, rate in EXCHANGE_RATES.items():
+        refreshed = cache.copy()
+        for code, rate in rates.items():
             if code != "USD":
-                cache[f"{code}_USD"] = {
+                refreshed[f"{code}_USD"] = {
                     "rate": rate,
                     "updated_at": timestamp,
-                    "source": "Stub",
+                    "source": provider_name,
                 }
-        cache["source"] = "Stub"
-        cache["last_refresh"] = timestamp
-        self.storage.save("rates.json", cache)
-        result = self._find(cache, source, target, now)
+        refreshed["source"] = provider_name
+        refreshed["last_refresh"] = timestamp
+        try:
+            result = self._find(refreshed, source, target, now)
+        except (ValueError, ArithmeticError) as error:
+            raise ApiRequestError("Некорректный курс в ответе поставщика") from error
+        if result is None:
+            raise ApiRequestError(f"Нет курса {source}→{target}")
+        self.storage.save("rates.json", refreshed)
         return {"from": source, "to": target, **result}

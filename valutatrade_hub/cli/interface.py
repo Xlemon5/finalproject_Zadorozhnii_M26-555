@@ -4,6 +4,12 @@ import shlex
 
 from prettytable import PrettyTable
 
+from valutatrade_hub.core.currencies import get_supported_codes
+from valutatrade_hub.core.exceptions import (
+    ApiRequestError,
+    CurrencyNotFoundError,
+    InsufficientFundsError,
+)
 from valutatrade_hub.core.usecases import WalletService
 
 COMMAND_OPTIONS = {
@@ -14,6 +20,7 @@ COMMAND_OPTIONS = {
     "buy": ({"currency", "amount"}, set()),
     "sell": ({"currency", "amount"}, set()),
     "get-rate": ({"from", "to"}, set()),
+    "currencies": (set(), set()),
     "help": (set(), set()),
     "logout": (set(), set()),
     "exit": (set(), set()),
@@ -26,6 +33,7 @@ HELP = """Команды:
   buy --currency <код> --amount <число>
   sell --currency <код> --amount <число>
   get-rate --from <код> --to <код>
+  currencies                             Показать поддерживаемые валюты
   logout                                 Выйти из учётной записи
   help                                   Показать справку
   exit                                   Завершить приложение
@@ -106,9 +114,7 @@ class WalletCLI:
                 self.service.logout()
                 print("Вы вышли из учётной записи")
             elif command == "show-portfolio":
-                self._print_portfolio(
-                    self.service.show_portfolio(options.get("base", "USD"))
-                )
+                self._print_portfolio(self.service.show_portfolio(options.get("base")))
             elif command == "deposit":
                 result = self.service.deposit(options["amount"])
                 print(f"Виртуальный баланс пополнен на {result['amount']:,.2f} USD")
@@ -120,6 +126,8 @@ class WalletCLI:
                 self._print_trade(
                     command, method(options["currency"], options["amount"])
                 )
+            elif command == "currencies":
+                print("\n".join(self.service.list_currencies()))
             elif command == "get-rate":
                 result = self.service.get_rate(options["from"], options["to"])
                 print(
@@ -130,6 +138,14 @@ class WalletCLI:
                     f"Обратный курс {result['to']}→{result['from']}: "
                     f"{1.0 / result['rate']:.8f}"
                 )
+        except InsufficientFundsError as error:
+            print(error)
+        except CurrencyNotFoundError as error:
+            print(error)
+            print("Поддерживаемые коды: " + ", ".join(get_supported_codes()))
+        except ApiRequestError as error:
+            print(error)
+            print("Повторите попытку позже или проверьте подключение к сети")
         except ValueError as error:
             print(error)
         except OSError as error:
@@ -196,4 +212,8 @@ class WalletCLI:
 
 def main() -> None:
     """Запускает общий CLI для команд wallet, project и python -m"""
-    WalletCLI().run()
+    try:
+        WalletCLI().run()
+    except (OSError, ValueError) as error:
+        print(f"Не удалось запустить приложение: {error}")
+        raise SystemExit(1) from error
