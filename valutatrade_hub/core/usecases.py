@@ -19,6 +19,7 @@ from valutatrade_hub.decorators import log_action
 from valutatrade_hub.infra.database import DatabaseManager
 from valutatrade_hub.infra.settings import SettingsLoader
 from valutatrade_hub.logging_config import configure_logging
+from valutatrade_hub.parser_service.updater import create_updater
 
 
 class WalletService:
@@ -52,7 +53,7 @@ class WalletService:
         return self.current_user
 
     def _load_users(self) -> dict[int, User]:
-        """Восстанавливает пользователей и проверяет уникальность имён и ID"""
+        """Восстанавливает пользователей и проверяет уникальность имен и ID"""
         records = self.storage.load("users.json", list)
         users = {}
         usernames = set()
@@ -163,7 +164,7 @@ class WalletService:
         portfolios = self._load_portfolios(self._load_users())
         if current.user_id not in portfolios:
             self.logout()
-            raise ValueError("Пользователь удалён. Сначала выполните login")
+            raise ValueError("Пользователь удален. Сначала выполните login")
         return portfolios, portfolios[current.user_id]
 
     def show_portfolio(self, base_currency: str | None = None) -> dict:
@@ -195,7 +196,7 @@ class WalletService:
             }
 
     def deposit(self, amount: float) -> dict:
-        """Пополняет USD-кошелёк виртуальными средствами для учебной торговли"""
+        """Пополняет USD-кошелек виртуальными средствами для учебной торговли"""
         with self.storage.transaction():
             self._require_login()
             amount = validate_number(amount, positive=True)
@@ -215,18 +216,18 @@ class WalletService:
 
     @log_action("SELL")
     def sell(self, currency_code: str, amount: float) -> dict:
-        """Продаёт валюту с зачислением выручки на USD-кошелёк"""
+        """Продает валюту с зачислением выручки на USD-кошелек"""
         return self._trade(currency_code, amount, buying=False)
 
     def _trade(self, currency_code: str, amount: float, *, buying: bool) -> dict:
-        """Проверяет сделку и сохраняет портфели только после всех расчётов"""
+        """Проверяет сделку и сохраняет портфели только после всех расчетов"""
         with self.storage.transaction():
             self._require_login()
             code = get_currency(currency_code).code
             amount = validate_number(amount, positive=True)
             if code == "USD":
                 raise ValueError(
-                    "USD — расчётная валюта. Для пополнения: deposit --amount <число>"
+                    "USD — расчетная валюта. Для пополнения: deposit --amount <число>"
                 )
             portfolios, portfolio = self._current_portfolios()
             if not buying:
@@ -264,6 +265,17 @@ class WalletService:
     def get_rate(self, from_currency: str, to_currency: str) -> dict:
         """Получает курс без необходимости входа в систему"""
         return self.rates.get_rate(from_currency, to_currency)
+
+    def update_rates(self, source: str | None = None) -> dict:
+        """Запрашивает выбранные API без удержания блокировки портфелей"""
+        updater = create_updater(
+            source=source, settings=self.settings, storage=self.storage
+        )
+        return updater.run_update()
+
+    def show_rates(self, currency=None, top=None, base=None) -> dict:
+        """Читает таблицу котировок без входа и без внешних запросов"""
+        return self.rates.show_rates(currency=currency, top=top, base=base)
 
     @staticmethod
     def list_currencies() -> list[str]:

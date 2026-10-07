@@ -94,10 +94,14 @@ class JsonStorage:
         except FileNotFoundError:
             return expected_type()
         except (ValueError, UnicodeError) as error:
-            raise ValueError(f"Повреждён файл {path}: некорректный JSON") from error
+            raise ValueError(f"Поврежден файл {path}: некорректный JSON") from error
         if not isinstance(data, expected_type):
             raise ValueError(f"Некорректная структура файла {path}")
         return data
+
+    def path_for(self, filename: str) -> Path:
+        """Возвращает путь логического файла для настройки Parser Service"""
+        return self.data_dir / filename
 
     def save(self, filename: str, data: dict | list) -> None:
         """Записывает временный файл рядом с исходным и заменяет его"""
@@ -122,11 +126,10 @@ class JsonStorage:
                 temporary_path.unlink(missing_ok=True)
 
     def initialize(self) -> None:
-        """Создаёт отсутствующие файлы, не меняя уже существующие"""
+        """Создает отсутствующие файлы, не меняя уже существующие"""
         for filename, empty in (
             ("users.json", []),
             ("portfolios.json", []),
-            ("rates.json", {}),
         ):
             if not (self.data_dir / filename).exists():
                 self.save(filename, empty)

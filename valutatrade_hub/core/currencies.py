@@ -15,7 +15,7 @@ def _required_text(value: str, field: str) -> str:
 
 
 class Currency(ABC):
-    """Задаёт общие свойства валюты и контракт её представления"""
+    """Задает общие свойства валюты и контракт ее представления"""
 
     def __init__(self, name: str, code: str) -> None:
         """Проверяет имя и код при создании валюты"""
@@ -55,7 +55,7 @@ class FiatCurrency(Currency):
     """Фиатная валюта со страной или зоной эмиссии"""
 
     def __init__(self, name: str, code: str, issuing_country: str) -> None:
-        """Создаёт фиатную валюту с проверкой страны эмиссии"""
+        """Создает фиатную валюту с проверкой страны эмиссии"""
         super().__init__(name, code)
         self.issuing_country = issuing_country
 
@@ -78,7 +78,7 @@ class CryptoCurrency(Currency):
     """Криптовалюта с алгоритмом и последней известной капитализацией"""
 
     def __init__(self, name: str, code: str, algorithm: str, market_cap: float) -> None:
-        """Создаёт криптовалюту с проверкой дополнительных атрибутов"""
+        """Создает криптовалюту с проверкой дополнительных атрибутов"""
         super().__init__(name, code)
         self.algorithm = algorithm
         self.market_cap = market_cap
@@ -117,8 +117,10 @@ CURRENCY_REGISTRY = {
     "USD": FiatCurrency("US Dollar", "USD", "United States"),
     "EUR": FiatCurrency("Euro", "EUR", "Eurozone"),
     "RUB": FiatCurrency("Russian Ruble", "RUB", "Russia"),
+    "GBP": FiatCurrency("Pound Sterling", "GBP", "United Kingdom"),
     "BTC": CryptoCurrency("Bitcoin", "BTC", "SHA-256", 1.12e12),
     "ETH": CryptoCurrency("Ethereum", "ETH", "Ethash", 4.5e11),
+    "SOL": CryptoCurrency("Solana", "SOL", "PoS / PoH", 0.0),
 }
 
 

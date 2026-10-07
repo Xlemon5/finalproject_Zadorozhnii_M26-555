@@ -10,7 +10,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.support import silent_logger
+from tests.support import seed_rates, silent_logger
 from valutatrade_hub.cli.interface import WalletCLI, parse_command
 from valutatrade_hub.core.usecases import WalletService
 from valutatrade_hub.core.utils import JsonStorage
@@ -23,6 +23,7 @@ class CLITests(unittest.TestCase):
         self.cli = WalletCLI(
             WalletService(JsonStorage(self.directory.name), logger=silent_logger())
         )
+        seed_rates(self.cli.service.storage)
 
     def execute(self, command):
         output = io.StringIO()
@@ -85,7 +86,7 @@ class CLITests(unittest.TestCase):
         path.write_text("{broken")
         keep_running, output = self.execute("register --username alice --password 1234")
         self.assertTrue(keep_running)
-        self.assertIn("Повреждён файл", output)
+        self.assertIn("Поврежден файл", output)
         self.assertEqual(path.read_text(), "{broken")
         self.assertIn("Команды:", self.execute("help")[1])
 
@@ -96,6 +97,7 @@ class CLITests(unittest.TestCase):
                     self.cli.run()
 
     def test_process_restart_preserves_data_but_not_login(self):
+        seed_rates(JsonStorage(Path(self.directory.name) / "data"))
         environment = os.environ.copy()
         # Тестируется пакет из текущего окружения, включая установленный wheel
         root = Path(__file__).resolve().parents[1]

@@ -4,13 +4,18 @@ import shlex
 
 from prettytable import PrettyTable
 
-from valutatrade_hub.core.currencies import get_supported_codes
+from valutatrade_hub.core.currencies import (
+    CryptoCurrency,
+    get_currency,
+    get_supported_codes,
+)
 from valutatrade_hub.core.exceptions import (
     ApiRequestError,
     CurrencyNotFoundError,
     InsufficientFundsError,
 )
 from valutatrade_hub.core.usecases import WalletService
+from valutatrade_hub.parser_service.updater import format_update
 
 COMMAND_OPTIONS = {
     "register": ({"username", "password"}, set()),
@@ -20,6 +25,8 @@ COMMAND_OPTIONS = {
     "buy": ({"currency", "amount"}, set()),
     "sell": ({"currency", "amount"}, set()),
     "get-rate": ({"from", "to"}, set()),
+    "update-rates": (set(), {"source"}),
+    "show-rates": (set(), {"currency", "top", "base"}),
     "currencies": (set(), set()),
     "help": (set(), set()),
     "logout": (set(), set()),
@@ -33,8 +40,10 @@ HELP = """Команды:
   buy --currency <код> --amount <число>
   sell --currency <код> --amount <число>
   get-rate --from <код> --to <код>
+  update-rates [--source coingecko|exchangerate]
+  show-rates [--currency <код>] [--top <N>] [--base USD]
   currencies                             Показать поддерживаемые валюты
-  logout                                 Выйти из учётной записи
+  logout                                 Выйти из учетной записи
   help                                   Показать справку
   exit                                   Завершить приложение
 Сумма buy/sell — количество единиц выбранной валюты.
@@ -79,6 +88,11 @@ def parse_command(line: str) -> tuple[str, dict]:
             options["amount"] = float(options["amount"])
         except ValueError as error:
             raise ValueError("'amount' должен быть положительным числом") from error
+    if "top" in options:
+        try:
+            options["top"] = int(options["top"])
+        except ValueError as error:
+            raise ValueError("--top должен быть положительным целым числом") from error
     return command, options
 
 
@@ -112,7 +126,7 @@ class WalletCLI:
                 print(f"Вы вошли как '{user.username}'")
             elif command == "logout":
                 self.service.logout()
-                print("Вы вышли из учётной записи")
+                print("Вы вышли из учетной записи")
             elif command == "show-portfolio":
                 self._print_portfolio(self.service.show_portfolio(options.get("base")))
             elif command == "deposit":
@@ -128,6 +142,11 @@ class WalletCLI:
                 )
             elif command == "currencies":
                 print("\n".join(self.service.list_currencies()))
+            elif command == "update-rates":
+                print("Обновление курсов...")
+                print(format_update(self.service.update_rates(options.get("source"))))
+            elif command == "show-rates":
+                self._print_rates(self.service.show_rates(**options))
             elif command == "get-rate":
                 result = self.service.get_rate(options["from"], options["to"])
                 print(
@@ -153,6 +172,30 @@ class WalletCLI:
         return True
 
     @staticmethod
+    def _print_rates(report: dict) -> None:
+        """Отмечает устаревшие котировки и показывает время каждой пары"""
+        print(
+            "Курсы из кэша "
+            f"(последнее обновление: {report['last_refresh'] or 'не указано'}):"
+        )
+        table = PrettyTable(["Пара", "Курс", "Получен (UTC)", "Источник", "Статус"])
+        for row in report["rates"]:
+            table.add_row(
+                [
+                    row["pair"],
+                    f"{row['rate']:.8f}",
+                    row["updated_at"],
+                    row["source"],
+                    "устарел" if row["stale"] else "свежий",
+                ]
+            )
+        print(table)
+        if not report["rates"]:
+            print("Нет курсов, соответствующих фильтрам")
+        if any(row["stale"] for row in report["rates"]):
+            print("Есть устаревшие курсы. Выполните 'update-rates' перед торговлей")
+
+    @staticmethod
     def _print_portfolio(report: dict) -> None:
         """Выводит готовую оценку портфеля таблицей"""
         base = report["base"]
@@ -164,7 +207,11 @@ class WalletCLI:
         table.align = "r"
         table.align["Валюта"] = "l"
         for row in report["wallets"]:
-            digits = 4 if row["currency_code"] in {"BTC", "ETH"} else 2
+            digits = (
+                4
+                if isinstance(get_currency(row["currency_code"]), CryptoCurrency)
+                else 2
+            )
             table.add_row(
                 [
                     row["currency_code"],
@@ -194,7 +241,10 @@ class WalletCLI:
 
     def run(self) -> None:
         """Принимает команды до exit, Ctrl+C или конца ввода"""
-        print("*** Валютный кошелёк ***\nИспользуются учебные курсы.")
+        print(
+            "*** Валютный кошелек ***\n"
+            "Курсы из локального кэша; обновление: update-rates"
+        )
         print(HELP)
         try:
             self.service.storage.initialize()

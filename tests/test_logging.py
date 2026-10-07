@@ -10,6 +10,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+from tests.support import seed_rates
 from valutatrade_hub.cli.interface import WalletCLI
 from valutatrade_hub.core.exceptions import (
     ApiRequestError,
@@ -37,6 +38,7 @@ class LoggingTests(unittest.TestCase):
         self.addCleanup(self.close_handlers)
         self.path = Path(self.directory.name) / "logs/actions.log"
         self.storage = JsonStorage(Path(self.directory.name) / "data")
+        seed_rates(self.storage)
         self.service = WalletService(
             self.storage, settings=self.settings, logger=self.logger
         )
@@ -154,23 +156,20 @@ class LoggingTests(unittest.TestCase):
         configure_logging(self.settings)
         self.assertTrue(self.logger.isEnabledFor(logging.DEBUG))
 
-    def test_provider_failure_is_logged_without_changing_cache_or_balances(self):
+    def test_missing_rate_is_logged_without_changing_cache_or_balances(self):
         self.login_and_deposit()
         self.storage.save("rates.json", {})
         rates_before = (self.storage.data_dir / "rates.json").read_bytes()
         portfolios_before = (self.storage.data_dir / "portfolios.json").read_bytes()
-        with patch.object(
-            self.service.rates, "_provider", side_effect=TimeoutError("timeout")
-        ):
-            with self.assertRaises(ApiRequestError):
-                self.service.buy("BTC", 0.01)
+        with self.assertRaisesRegex(ValueError, "update-rates"):
+            self.service.buy("BTC", 0.01)
         self.assertEqual(
             (self.storage.data_dir / "rates.json").read_bytes(), rates_before
         )
         self.assertEqual(
             (self.storage.data_dir / "portfolios.json").read_bytes(), portfolios_before
         )
-        self.assertEqual(self.records()[0]["error_type"], "ApiRequestError")
+        self.assertEqual(self.records()[0]["error_type"], "ValueError")
 
     def test_cli_explains_domain_errors_and_continues(self):
         self.login_and_deposit()
@@ -194,9 +193,9 @@ class LoggingTests(unittest.TestCase):
             for fragment in fragments:
                 self.assertIn(fragment, output.getvalue())
         with patch.object(
-            self.service.rates, "_provider", side_effect=TimeoutError("timeout")
+            self.service, "update_rates", side_effect=ApiRequestError("timeout")
         ):
             with redirect_stdout(io.StringIO()) as output:
-                self.assertTrue(cli.execute("get-rate --from BTC --to USD"))
+                self.assertTrue(cli.execute("update-rates"))
         self.assertIn("Ошибка при обращении к внешнему API: timeout", output.getvalue())
         self.assertIn("Повторите попытку позже", output.getvalue())

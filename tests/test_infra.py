@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.support import silent_logger
+from tests.support import seed_rates, silent_logger
 from valutatrade_hub.core.rates import RateService
 from valutatrade_hub.core.usecases import WalletService
 from valutatrade_hub.infra.database import DatabaseManager
@@ -101,6 +101,7 @@ class InfraTests(unittest.TestCase):
     def test_default_base_currency_and_ttl_follow_settings_reload(self):
         settings = self.configure(rates_ttl_seconds=60, default_base_currency="EUR")
         service = WalletService(logger=silent_logger())
+        seed_rates(service.storage)
         service.register("alice", "1234")
         service.login("alice", "1234")
         service.deposit(100)
@@ -113,7 +114,8 @@ class InfraTests(unittest.TestCase):
         }
         service.storage.save("rates.json", old)
         rates = RateService(service.storage, settings=settings)
-        self.assertEqual(rates.get_rate("BTC", "USD")["rate"], 59337.21)
+        with self.assertRaisesRegex(ValueError, "устарел"):
+            rates.get_rate("BTC", "USD")
         self.path.write_text('{"rates_ttl_seconds": 120}')
         settings.reload()
         service.storage.save("rates.json", old)

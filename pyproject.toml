@@ -9,11 +9,13 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "prettytable>=3.18.0",
+    "requests>=2.32.3",
 ]
 
 [project.scripts]
 project = "valutatrade_hub.cli.interface:main"
 wallet = "valutatrade_hub.cli.interface:main"
+rates-parser = "valutatrade_hub.parser_service.scheduler:main"
 
 [build-system]
 requires = ["uv_build>=0.12.17,<0.13.0"]
@@ -42,6 +44,10 @@ data_dir = "data"
 users_file = "users.json"
 portfolios_file = "portfolios.json"
 rates_file = "rates.json"
+history_file = "exchange_rates.json"
+request_timeout = 10
+parser_interval_seconds = 300
+parser_log_file = "parser.log"
 rates_ttl_seconds = 300
 default_base_currency = "USD"
 log_dir = "logs"

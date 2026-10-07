@@ -12,6 +12,10 @@ DEFAULTS = {
     "users_file": "users.json",
     "portfolios_file": "portfolios.json",
     "rates_file": "rates.json",
+    "history_file": "exchange_rates.json",
+    "request_timeout": 10,
+    "parser_interval_seconds": 300,
+    "parser_log_file": "parser.log",
     "rates_ttl_seconds": 300,
     "default_base_currency": "USD",
     "log_dir": "logs",
@@ -31,7 +35,7 @@ class SettingsLoader:
     _instance_lock = threading.RLock()
 
     def __new__(cls, config_path: str | Path | None = None):
-        """Создаёт и загружает настройки только при первом обращении"""
+        """Создает и загружает настройки только при первом обращении"""
         # __new__ выбран как простой и явный способ без отдельного метакласса
         with cls._instance_lock:
             if cls._instance is None:
@@ -70,7 +74,7 @@ class SettingsLoader:
             except (ValueError, UnicodeError, AttributeError) as error:
                 raise ValueError("Некорректный файл настроек") from error
             if not isinstance(overrides, dict):
-                raise ValueError("Настройки valutatrade должны быть словарём")
+                raise ValueError("Настройки valutatrade должны быть словарем")
             unknown = overrides.keys() - DEFAULTS.keys()
             if unknown:
                 raise ValueError("Неизвестные настройки: " + ", ".join(sorted(unknown)))
@@ -85,11 +89,12 @@ class SettingsLoader:
         """Проверяет пути, срок курсов и параметры журнала"""
         for key in ("data_dir", "log_dir"):
             if not isinstance(values[key], str) or not values[key].strip():
-                raise ValueError(f"Настройка {key} должна быть непустым путём")
+                raise ValueError(f"Настройка {key} должна быть непустым путем")
         filenames = [
-            values[key] for key in ("users_file", "portfolios_file", "rates_file")
+            values[key]
+            for key in ("users_file", "portfolios_file", "rates_file", "history_file")
         ]
-        for value in [*filenames, values["log_file"]]:
+        for value in [*filenames, values["log_file"], values["parser_log_file"]]:
             if (
                 not isinstance(value, str)
                 or not value.strip()
@@ -99,8 +104,16 @@ class SettingsLoader:
             ):
                 raise ValueError("Имена файлов должны указываться без пути")
         if len(set(filenames)) != len(filenames):
-            raise ValueError("Для данных нужны три разных JSON-файла")
-        for key in ("rates_ttl_seconds", "log_max_bytes", "log_backup_count"):
+            raise ValueError("Для данных нужны разные JSON-файлы")
+        if values["log_file"] == values["parser_log_file"]:
+            raise ValueError("Журналы действий и парсера должны иметь разные имена")
+        for key in (
+            "rates_ttl_seconds",
+            "log_max_bytes",
+            "log_backup_count",
+            "request_timeout",
+            "parser_interval_seconds",
+        ):
             if type(values[key]) is not int or values[key] <= 0:
                 raise ValueError(
                     f"Настройка {key} должна быть положительным целым числом"

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.support import silent_logger
+from tests.support import seed_rates, silent_logger
 from valutatrade_hub.core.usecases import WalletService
 from valutatrade_hub.core.utils import JsonStorage
 
@@ -17,6 +17,7 @@ class ServiceTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.storage = JsonStorage(self.directory.name)
         self.storage.initialize()
+        seed_rates(self.storage)
         self.service = WalletService(self.storage, logger=silent_logger())
 
     def register_and_login(self, username="alice"):
@@ -112,7 +113,7 @@ class ServiceTests(unittest.TestCase):
             (lambda: self.service.buy("BTC", 1), "Недостаточно средств"),
             (lambda: self.service.sell("BTC", 1), "Недостаточно средств"),
             (lambda: self.service.buy("ABC", 1), "Неизвестная валюта"),
-            (lambda: self.service.buy("USD", 1), "расчётная валюта"),
+            (lambda: self.service.buy("USD", 1), "расчетная валюта"),
             (lambda: self.service.show_portfolio("ABC"), "Неизвестная валюта"),
         ):
             with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):

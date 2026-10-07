@@ -8,7 +8,7 @@ from valutatrade_hub.core.models import Portfolio, User, Wallet
 
 
 def make_user() -> User:
-    """Создаёт пользователя с известным паролем без обращения к файлам"""
+    """Создает пользователя с известным паролем без обращения к файлам"""
     return User(
         1,
         "alice",

@@ -17,15 +17,15 @@ def _log_value(value):
 
 
 def log_action(action: str, *, verbose: bool | None = None):
-    """Записывает результат операции и пробрасывает её исключения без замены"""
+    """Записывает результат операции и пробрасывает ее исключения без замены"""
 
     def decorator(function):
-        """Оборачивает функцию с сохранением её имени, документации и сигнатуры"""
+        """Оборачивает функцию с сохранением ее имени, документации и сигнатуры"""
         parameters = signature(function)
 
         @wraps(function)
         def wrapper(*args, **kwargs):
-            """Записывает только разрешённые поля аргументов и результата"""
+            """Записывает только разрешенные поля аргументов и результата"""
             arguments = parameters.bind(*args, **kwargs).arguments
             service = arguments.get("self")
             settings = getattr(service, "settings", None)

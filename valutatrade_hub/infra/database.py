@@ -17,10 +17,11 @@ class DatabaseManager:
         "users.json": "users_file",
         "portfolios.json": "portfolios_file",
         "rates.json": "rates_file",
+        "exchange_rates.json": "history_file",
     }
 
     def __new__(cls, settings: SettingsLoader | None = None):
-        """Создаёт один менеджер при первом обращении, а не при импорте"""
+        """Создает один менеджер при первом обращении, а не при импорте"""
         # __new__ сохраняет Singleton явным и не требует метакласса
         with cls._instance_lock:
             if cls._instance is None:
@@ -45,6 +46,10 @@ class DatabaseManager:
             raise ValueError(f"Неизвестный файл хранилища: {filename}")
         return self._settings.get(self._file_settings[filename])
 
+    def path_for(self, filename: str) -> Path:
+        """Возвращает путь с учетом переименования файлов в настройках"""
+        return self.data_dir / self._filename(filename)
+
     @contextmanager
     def transaction(self):
         """Не допускает пересечения операций записи в одном процессе"""
@@ -64,12 +69,11 @@ class DatabaseManager:
             JsonStorage(self.data_dir).save(self._filename(filename), data)
 
     def initialize(self) -> None:
-        """Создаёт только отсутствующие файлы с учётом настроек"""
+        """Создает только отсутствующие файлы с учетом настроек"""
         with self.transaction():
             for filename, empty in (
                 ("users.json", []),
                 ("portfolios.json", []),
-                ("rates.json", {}),
             ):
                 if not (self.data_dir / self._filename(filename)).exists():
                     self.save(filename, empty)

@@ -1,4 +1,4 @@
-"""Пользователь, отдельный кошелёк и портфель пользователя"""
+"""Пользователь, отдельный кошелек и портфель пользователя"""
 
 import hashlib
 import hmac
@@ -30,7 +30,7 @@ class User:
         salt: str,
         registration_date: datetime,
     ) -> None:
-        """Создаёт пользователя из полей, сохранённых в хранилище"""
+        """Создает пользователя из полей, сохраненных в хранилище"""
         self._user_id = validate_user_id(user_id)
         self.username = username
         if (
@@ -93,7 +93,7 @@ class User:
         ).hexdigest()
 
     def verify_password(self, password: str) -> bool:
-        """Сравнивает хеш введённого пароля с сохранённым"""
+        """Сравнивает хеш введенного пароля с сохраненным"""
         if not isinstance(password, str):
             return False
         candidate = hashlib.sha256((password + self.salt).encode("utf-8")).hexdigest()
@@ -112,7 +112,7 @@ class Wallet:
     """Баланс одной валюты с проверками пополнения и снятия"""
 
     def __init__(self, currency_code: str, balance: float = 0.0) -> None:
-        """Создаёт кошелёк с неотрицательным балансом"""
+        """Создает кошелек с неотрицательным балансом"""
         self._currency_code = get_currency(currency_code).code
         self.balance = balance
 
@@ -132,7 +132,7 @@ class Wallet:
         self._balance = validate_number(value)
 
     def deposit(self, amount: float) -> None:
-        """Пополняет кошелёк положительной суммой"""
+        """Пополняет кошелек положительной суммой"""
         amount = validate_number(amount, positive=True)
         result = validate_number(self.balance + amount)
         if result == self.balance:
@@ -170,7 +170,7 @@ class Portfolio:
             raise ValueError("Пользователь не соответствует владельцу портфеля")
         self._user = user
         if wallets is not None and not isinstance(wallets, dict):
-            raise ValueError("Кошельки должны быть словарём")
+            raise ValueError("Кошельки должны быть словарем")
         self._wallets = {}
         for code, wallet in (wallets or {}).items():
             if not isinstance(wallet, Wallet) or code != wallet.currency_code:
@@ -193,19 +193,19 @@ class Portfolio:
         return self._wallets.copy()
 
     def add_currency(self, currency_code: str) -> Wallet:
-        """Добавляет пустой кошелёк; существующий возвращает без изменений"""
+        """Добавляет пустой кошелек; существующий возвращает без изменений"""
         code = get_currency(currency_code).code
         if code not in self._wallets:
             self._wallets[code] = Wallet(code)
         return self._wallets[code]
 
     def get_wallet(self, currency_code: str) -> Wallet:
-        """Возвращает кошелёк либо сообщает о его отсутствии"""
+        """Возвращает кошелек либо сообщает о его отсутствии"""
         code = get_currency(currency_code).code
         if code not in self._wallets:
             raise ValueError(
                 f"У вас нет кошелька '{code}'. Добавьте валюту: "
-                "она создаётся автоматически при покупке"
+                "она создается автоматически при покупке"
             )
         return self._wallets[code]
 

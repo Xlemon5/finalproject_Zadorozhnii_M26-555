@@ -31,17 +31,23 @@ class ActionFormatter(logging.Formatter):
         return json.dumps(event, ensure_ascii=False, allow_nan=False)
 
 
-def configure_logging(settings: SettingsLoader | None = None) -> logging.Logger:
+def configure_logging(
+    settings: SettingsLoader | None = None, *, parser=False
+) -> logging.Logger:
     """Настраивает один обработчик; повторные вызовы не дублируют записи"""
     settings = settings if settings is not None else SettingsLoader()
-    path = Path(settings.get("log_dir")) / settings.get("log_file")
+    path = Path(settings.get("log_dir")) / settings.get(
+        "parser_log_file" if parser else "log_file"
+    )
     signature = (
         str(path),
         settings.get("log_max_bytes"),
         settings.get("log_backup_count"),
     )
     with _configuration_lock:
-        logger = logging.getLogger("valutatrade.actions")
+        logger = logging.getLogger(
+            "valutatrade.parser" if parser else "valutatrade.actions"
+        )
         logger.setLevel(settings.get("log_level"))
         logger.propagate = False
         for handler in logger.handlers:
