@@ -1,0 +1,38 @@
+[project]
+name = "finalproject-zadorozhnii-m26-555"
+version = "0.1.0"
+description = "A console application simulating a currency wallet."
+readme = "README.md"
+authors = [
+    { name = "Xlemon5", email = "80254502+Xlemon5@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "prettytable>=3.18.0",
+]
+
+[project.scripts]
+project = "valutatrade_hub.cli.interface:main"
+wallet = "valutatrade_hub.cli.interface:main"
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "valutatrade_hub"
+module-root = ""
+source-include = ["main.py", "tests/**", "Makefile", ".python-version"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.9",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = ["venv", ".venv", "dist", "__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
