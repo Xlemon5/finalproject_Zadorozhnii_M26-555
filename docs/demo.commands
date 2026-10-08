@@ -1,0 +1,20 @@
+show-rates
+register --username demo --password demo1234
+login --username demo --password demo1234
+show-portfolio
+deposit --amount 10000
+update-rates
+show-rates --top 2
+buy --currency BTC --amount 0.005
+buy --currency EUR --amount 10
+sell --currency BTC --amount 0.002
+show-portfolio
+show-portfolio --base EUR
+get-rate --from USD --to BTC
+show-rates --currency RUB
+sell --currency BTC --amount 10
+get-rate --from ABC --to USD
+buy --currency EUR --amount -1
+logout
+show-portfolio
+exit

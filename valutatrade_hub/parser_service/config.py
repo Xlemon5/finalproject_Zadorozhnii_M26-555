@@ -5,9 +5,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from dotenv import dotenv_values
+
 from valutatrade_hub.core.currencies import CryptoCurrency, FiatCurrency, get_currency
 from valutatrade_hub.core.utils import validate_number
 from valutatrade_hub.infra.settings import SettingsLoader
+
+
+def get_api_key(name: str) -> str:
+    """Читает ключ из окружения или .env рабочей папки без изменения os.environ"""
+    if name in os.environ:
+        return os.environ[name]
+    values = dotenv_values(Path.cwd() / ".env", interpolate=False)
+    return values.get(name) or ""
 
 
 @dataclass
@@ -15,10 +25,10 @@ class ParserConfig:
     """Хранит параметры API; ключи не попадают в строковое представление"""
 
     EXCHANGERATE_API_KEY: str = field(
-        default_factory=lambda: os.getenv("EXCHANGERATE_API_KEY", ""), repr=False
+        default_factory=lambda: get_api_key("EXCHANGERATE_API_KEY"), repr=False
     )
     COINGECKO_API_KEY: str = field(
-        default_factory=lambda: os.getenv("COINGECKO_API_KEY", ""), repr=False
+        default_factory=lambda: get_api_key("COINGECKO_API_KEY"), repr=False
     )
     COINGECKO_URL: str = "https://api.coingecko.com/api/v3/simple/price"
     EXCHANGERATE_API_URL: str = "https://v6.exchangerate-api.com/v6"
@@ -83,6 +93,7 @@ class ParserConfig:
         settings = settings if settings is not None else SettingsLoader()
 
         def path(logical, key):
+            """Выбирает путь из переданного хранилища либо настроек проекта"""
             if storage is not None:
                 return str(storage.path_for(logical))
             return str(Path(settings.get("data_dir")) / settings.get(key))

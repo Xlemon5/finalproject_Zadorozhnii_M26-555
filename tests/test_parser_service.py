@@ -121,6 +121,44 @@ class ParserTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             BaseApiClient(self.config)
 
+    def test_local_env_file_is_loaded_without_mutating_process_environment(self):
+        (self.directory / ".env").write_text(
+            'EXCHANGERATE_API_KEY="local-fixture-key"\n'
+            'COINGECKO_API_KEY="local-demo-key"\n'
+            "UNRELATED_SETTING=ignored\n"
+        )
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch(
+                "valutatrade_hub.parser_service.config.Path.cwd",
+                return_value=self.directory,
+            ),
+        ):
+            config = ParserConfig()
+            self.assertEqual(config.EXCHANGERATE_API_KEY, "local-fixture-key")
+            self.assertEqual(config.COINGECKO_API_KEY, "local-demo-key")
+            self.assertNotIn("EXCHANGERATE_API_KEY", os.environ)
+            self.assertNotIn("UNRELATED_SETTING", os.environ)
+            self.assertNotIn("local-fixture-key", repr(config))
+            with patch.dict(os.environ, {"EXCHANGERATE_API_KEY": "environment-key"}):
+                self.assertEqual(ParserConfig().EXCHANGERATE_API_KEY, "environment-key")
+            with patch.dict(os.environ, {"EXCHANGERATE_API_KEY": ""}):
+                self.assertEqual(ParserConfig().EXCHANGERATE_API_KEY, "")
+            explicit = ParserConfig(EXCHANGERATE_API_KEY="explicit-key")
+            self.assertEqual(explicit.EXCHANGERATE_API_KEY, "explicit-key")
+
+    def test_missing_local_env_and_environment_give_empty_keys(self):
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch(
+                "valutatrade_hub.parser_service.config.Path.cwd",
+                return_value=self.directory,
+            ),
+        ):
+            config = ParserConfig()
+        self.assertEqual(config.EXCHANGERATE_API_KEY, "")
+        self.assertEqual(config.COINGECKO_API_KEY, "")
+
     def test_crypto_request_ids_timeout_header_and_metadata(self):
         client = CoinGeckoClient(self.config)
         with patch("requests.get", return_value=response(CRYPTO)) as get:

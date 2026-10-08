@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "prettytable>=3.18.0",
+    "python-dotenv>=1.2.4",
     "requests>=2.32.3",
 ]
 
@@ -24,7 +25,10 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = "valutatrade_hub"
 module-root = ""
-source-include = ["main.py", "tests/**", "Makefile", ".python-version"]
+source-include = [
+    "main.py", "tests/**", "Makefile", ".python-version",
+    "scripts/**", "docs/**", ".env.example",
+]
 
 [dependency-groups]
 dev = [

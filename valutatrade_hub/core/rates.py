@@ -69,6 +69,7 @@ class RateService:
     """Вычисляет прямые, обратные и кросс-курсы по локальному снимку"""
 
     def __init__(self, storage, ttl: int | None = None, *, settings=None):
+        """Подключает хранилище и настройки TTL без загрузки курсов из сети"""
         self.storage = storage
         if ttl is not None and (type(ttl) is not int or ttl <= 0):
             raise ValueError("TTL должен быть положительным целым числом")
@@ -77,6 +78,7 @@ class RateService:
 
     @property
     def ttl(self) -> int:
+        """Возвращает явный TTL либо актуальное значение из SettingsLoader"""
         return self._ttl_override or self.settings.get("rates_ttl_seconds")
 
     def _load(self) -> dict:
@@ -144,7 +146,12 @@ class RateService:
             raise ValueError(
                 f"Курс {source}→{target} {reason}. Выполните 'update-rates'"
             )
-        return {"from": source, "to": target, **result}
+        return {
+            "from": source,
+            "to": target,
+            **result,
+            "inverse_rate": validate_number(1 / result["rate"], positive=True),
+        }
 
     def show_rates(self, currency=None, top=None, base=None) -> dict:
         """Возвращает таблицу кэша, включая явно помеченные устаревшие записи"""

@@ -12,6 +12,7 @@ class RatesScheduler:
     """Запускает первый цикл сразу, затем ждет интервал после каждого цикла"""
 
     def __init__(self, updater, interval: int = 300, *, stop_event=None):
+        """Настраивает обновление с интервалом и сигналом остановки"""
         if type(interval) is not int or interval <= 0:
             raise ValueError("Интервал должен быть положительным целым числом")
         self.updater = updater
@@ -19,6 +20,7 @@ class RatesScheduler:
         self.stop_event = stop_event if stop_event is not None else Event()
 
     def run(self):
+        """Повторяет обновления до сигнала остановки или Ctrl+C"""
         try:
             while not self.stop_event.is_set():
                 try:

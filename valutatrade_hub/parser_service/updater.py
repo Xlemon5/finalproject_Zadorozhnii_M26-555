@@ -15,11 +15,13 @@ class RatesUpdater:
     """Продолжает обновление остальных источников при отказе одного клиента"""
 
     def __init__(self, clients, storage, *, logger=None):
+        """Принимает API-клиенты, хранилище и необязательный журнал"""
         self.clients = list(clients)
         self.storage = storage
         self.logger = logger if logger is not None else configure_logging(parser=True)
 
     def run_update(self) -> dict:
+        """Сохраняет успешные ответы и возвращает число курсов и ошибки источников"""
         self.logger.info(
             {
                 "event": "update_started",

@@ -39,6 +39,7 @@ class ParserStorage:
     """Сохраняет все измерения; более старый ответ не заменяет свежий курс"""
 
     def __init__(self, config: ParserConfig):
+        """Выбирает абсолютные пути к снимку курсов и истории измерений"""
         self.rates_path = Path(config.RATES_FILE_PATH).resolve()
         self.history_path = Path(config.HISTORY_FILE_PATH).resolve()
 

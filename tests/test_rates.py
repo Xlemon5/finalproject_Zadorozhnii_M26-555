@@ -45,6 +45,9 @@ class RateTests(unittest.TestCase):
                 self.assertAlmostEqual(
                     self.service.get_rate("USD", "BTC")["rate"], 1 / 60000
                 )
+                self.assertEqual(
+                    self.service.get_rate("USD", "BTC")["inverse_rate"], 60000
+                )
                 self.assertAlmostEqual(
                     self.service.get_rate("btc", "eur")["rate"], 50000
                 )

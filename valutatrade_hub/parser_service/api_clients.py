@@ -19,6 +19,7 @@ class BaseApiClient(ABC):
     source = "API"
 
     def __init__(self, config: ParserConfig):
+        """Принимает настройки API и создает пустые метаданные ответа"""
         self.config = config
         self.fetched_at = None
         self.last_metadata = {}
@@ -85,6 +86,7 @@ class CoinGeckoClient(BaseApiClient):
     source = "CoinGecko"
 
     def fetch_rates(self) -> dict[str, float]:
+        """Возвращает цены выбранных криптовалют в USD и запоминает метаданные"""
         headers = {}
         if self.config.COINGECKO_API_KEY:
             headers["x-cg-demo-api-key"] = self.config.COINGECKO_API_KEY
@@ -127,6 +129,7 @@ class ExchangeRateApiClient(BaseApiClient):
     source = "ExchangeRate-API"
 
     def fetch_rates(self) -> dict[str, float]:
+        """Возвращает стоимость единицы каждой фиатной валюты в USD"""
         if not self.config.EXCHANGERATE_API_KEY:
             raise ApiRequestError(
                 "ExchangeRate-API: задайте EXCHANGERATE_API_KEY в окружении"

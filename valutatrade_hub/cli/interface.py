@@ -155,7 +155,7 @@ class WalletCLI:
                 )
                 print(
                     f"Обратный курс {result['to']}→{result['from']}: "
-                    f"{1.0 / result['rate']:.8f}"
+                    f"{result['inverse_rate']:.8f}"
                 )
         except InsufficientFundsError as error:
             print(error)
